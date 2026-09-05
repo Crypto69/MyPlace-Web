@@ -39,7 +39,7 @@ class AirconError(RuntimeError):
 
 
 class AirconClient:
-    def __init__(self, host: str, port: int = 2025, timeout: float = 8.0):
+    def __init__(self, host: str, port: int = 2025, timeout: float = 20.0):
         self.host = host
         self.port = port
         self.timeout = timeout
@@ -64,7 +64,12 @@ class AirconClient:
                 await asyncio.sleep(RETRY_DELAY * attempt)
             async with _lock:
                 try:
-                    async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    # The tablet's wifi power-saves aggressively: the first
+                    # connection after an idle spell can take several seconds
+                    # even though the response itself is fast. Give the connect
+                    # phase its own generous budget.
+                    limits = httpx.Timeout(self.timeout, connect=self.timeout)
+                    async with httpx.AsyncClient(timeout=limits) as client:
                         resp = await client.get(url, params=params)
                         resp.raise_for_status()
                         text = resp.text

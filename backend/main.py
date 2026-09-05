@@ -44,7 +44,9 @@ MAX_TEMP = float(os.environ.get("MYPLACE_MAX_TEMP", "30"))
 TEMP_STEP = float(os.environ.get("MYPLACE_TEMP_STEP", "1"))
 
 app = FastAPI(title="MyPlace Heating")
-client = AirconClient(TABLET_HOST, TABLET_PORT) if TABLET_HOST else None
+# The tablet's wifi is slow to wake, so the default timeout is generous.
+TIMEOUT = float(os.environ.get("MYPLACE_TIMEOUT", "20"))
+client = AirconClient(TABLET_HOST, TABLET_PORT, TIMEOUT) if TABLET_HOST else None
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 
@@ -117,7 +119,9 @@ async def diagnose():
 
     # Can we open a TCP connection at all?
     sock = socket.socket()
-    sock.settimeout(4)
+    # The tablet's wifi can take seconds to wake; a short probe would report a
+    # false failure on a link that actually works.
+    sock.settimeout(TIMEOUT)
     try:
         sock.connect((TABLET_HOST, TABLET_PORT))
         result["tcp"] = "open"
