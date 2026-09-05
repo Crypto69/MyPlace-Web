@@ -52,15 +52,13 @@ echo 'MYPLACE_HOST=192.168.1.115' > .env      # the wall tablet
 ./deploy.sh
 ```
 
-Then open `http://big-kahuna-stor:8322` in a browser.
+`deploy.sh` prints the URL to open, normally
+`http://big-kahuna-stor:8322`.
 
-If `deploy.sh` reports that port 8322 is already taken by another container,
-pick a free one and redeploy - nothing else needs changing:
-
-```bash
-echo 'MYPLACE_PORT_LAN=8323' >> .env
-./deploy.sh
-```
+It picks the port itself: it prefers 8322, walks up if the box already has
+that, and records the choice in `.env` so the address stays the same on every
+later deploy. To pin a specific port, set `MYPLACE_PORT_LAN` in `.env`
+yourself.
 
 ## Updating
 

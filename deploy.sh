@@ -42,19 +42,52 @@ else
   echo "  Create one with:  echo 'MYPLACE_HOST=192.168.1.115' > .env"
 fi
 
-# The LAN port can be overridden in .env when something else on the box has
-# the default; read it back so the messages below are not misleading.
-LAN_PORT="$(sed -n 's/^MYPLACE_PORT_LAN=//p' .env 2>/dev/null | tail -1)"
-[ -n "$LAN_PORT" ] || LAN_PORT=8322
+# --- pick a LAN port ------------------------------------------------------
+# Prefer whatever this app is already published on, so a redeploy keeps the
+# same URL. Otherwise take 8322, and if the box already has that, walk up
+# until something is free. The chosen port is written to .env so it stays
+# stable across future deploys - a heating app whose address moves is worse
+# than useless.
 
-# Fail early and clearly rather than after a full build.
-if docker ps --format '{{.Ports}}' 2>/dev/null | grep -q ":${LAN_PORT}->"; then
-  echo "note: port ${LAN_PORT} is already in use by another container:"
-  docker ps --format '  {{.Names}}  {{.Ports}}' | grep ":${LAN_PORT}->"
-  echo "Either stop that container, or pick another port:"
-  echo "  echo 'MYPLACE_PORT_LAN=8323' >> .env && ./deploy.sh"
-  exit 1
+port_in_use() {
+  # Any container publishing this host port, plus anything else listening.
+  if docker ps --format '{{.Ports}}' 2>/dev/null | grep -q "[:.]$1->"; then
+    return 0
+  fi
+  if command -v nc >/dev/null 2>&1 && nc -z 127.0.0.1 "$1" 2>/dev/null; then
+    return 0
+  fi
+  return 1
+}
+
+# What is this app already using, if anything?
+LAN_PORT="$(docker compose ps --format '{{.Publishers}}' 2>/dev/null \
+  | tr ',' '\n' | sed -n 's/.*[:.]\([0-9]\{4,5\}\)->8000.*/\1/p' | head -1)"
+
+# Or a port previously chosen and recorded.
+if [ -z "$LAN_PORT" ]; then
+  LAN_PORT="$(sed -n 's/^MYPLACE_PORT_LAN=//p' .env 2>/dev/null | tail -1)"
 fi
+
+# Otherwise find a free one, starting at the usual 8322.
+if [ -z "$LAN_PORT" ]; then
+  LAN_PORT=8322
+  while port_in_use "$LAN_PORT"; do
+    echo "port ${LAN_PORT} is taken, trying $((LAN_PORT + 1))"
+    LAN_PORT=$((LAN_PORT + 1))
+    if [ "$LAN_PORT" -gt 8400 ]; then
+      echo "could not find a free port between 8322 and 8400" >&2
+      exit 1
+    fi
+  done
+fi
+
+# Record it so this app keeps the same address on every future deploy.
+if ! grep -q "^MYPLACE_PORT_LAN=${LAN_PORT}\$" .env 2>/dev/null; then
+  [ -f .env ] && sed -i.bak '/^MYPLACE_PORT_LAN=/d' .env 2>/dev/null && rm -f .env.bak
+  echo "MYPLACE_PORT_LAN=${LAN_PORT}" >> .env
+fi
+export MYPLACE_PORT_LAN="$LAN_PORT"
 
 echo "building myplace ${GIT_SHA} (${BUILD_TIME}) on port ${LAN_PORT}"
 docker compose build
