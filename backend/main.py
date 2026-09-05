@@ -170,6 +170,17 @@ async def heat_on(body: TempBody):
     )
 
 
+@app.post("/api/zone/{zone_id}/temp")
+async def zone_temp(zone_id: str, body: TempBody):
+    """Set one room's target temperature.
+
+    On a zoned system this is what actually controls the heating: the unit
+    follows the zone named by `myZone`, so the system-level setTemp alone
+    changes nothing the user can feel.
+    """
+    return await _zone_change(zone_id, {"setTemp": _clamp(body.temp)})
+
+
 @app.post("/api/zone/{zone_id}")
 async def zone(zone_id: str, body: ZoneBody):
     change: dict = {}
@@ -183,7 +194,10 @@ async def zone(zone_id: str, body: ZoneBody):
         change["value"] = max(0, min(100, body.value))
     if not change:
         raise HTTPException(400, "nothing to change")
+    return await _zone_change(zone_id, change)
 
+
+async def _zone_change(zone_id: str, change: dict) -> dict:
     c = _client()
     try:
         ac = summarize(await c.get_system_data())["acId"]
