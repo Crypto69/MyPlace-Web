@@ -1,8 +1,9 @@
 # MyPlace Heating — web control
 
 A small web app for controlling an Advantage Air (MyPlace / MyAir) ducted
-heating system from a browser on the home network. Built for hands-free use:
-large targets, no dragging, no swiping, no long-presses.
+heating system from a browser on the home network. Built for hands-free use
+with a head mouse: comfortable targets, no dragging, no swiping, no
+long-presses.
 
 Runs in Docker on the TerraMaster NAS. **LAN only** — see Security.
 
@@ -87,15 +88,20 @@ default) and rounded to the 0.5° step the system uses.
 
 ## Accessibility
 
-Designed for head-pointer, eye-gaze and switch access:
+Built for driving with a gyroscopic head mouse:
 
-- Every target is at least 120px tall — far above the 44px WCAG minimum.
-- Large gaps, so an overshoot lands on nothing rather than the wrong control.
-- Tap-only. No drag, swipe, or long-press anywhere in the app.
-- Thick high-contrast focus ring for switch scanning and keyboard driving.
+- Moderate targets — 68px base, 96px for the primary actions. Above the 44px
+  WCAG minimum and easy to hit, without the waste of oversized controls.
+- Clear gaps, so a small overshoot lands on nothing rather than on the wrong
+  control.
+- Click-only. No drag, swipe, or long-press anywhere in the app.
+- High-contrast focus ring for keyboard and switch driving.
 - Every control is a real `<button>`, so tab order and screen readers work.
-- One-tap presets for the common cases, avoiding repeated +/- taps.
+- One-click presets for the common cases, avoiding repeated +/- clicks.
 - Honours `prefers-reduced-motion`.
+
+To resize everything, change `--gap`, `--radius` and the `font-size` on `body`
+in `frontend/src/style.css`; the rest is in `rem` and scales with them.
 
 ## Security
 
