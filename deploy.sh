@@ -42,8 +42,23 @@ else
   echo "  Create one with:  echo 'MYPLACE_HOST=192.168.1.115' > .env"
 fi
 
-echo "building myplace ${GIT_SHA} (${BUILD_TIME})"
+# The LAN port can be overridden in .env when something else on the box has
+# the default; read it back so the messages below are not misleading.
+LAN_PORT="$(sed -n 's/^MYPLACE_PORT_LAN=//p' .env 2>/dev/null | tail -1)"
+[ -n "$LAN_PORT" ] || LAN_PORT=8322
+
+# Fail early and clearly rather than after a full build.
+if docker ps --format '{{.Ports}}' 2>/dev/null | grep -q ":${LAN_PORT}->"; then
+  echo "note: port ${LAN_PORT} is already in use by another container:"
+  docker ps --format '  {{.Names}}  {{.Ports}}' | grep ":${LAN_PORT}->"
+  echo "Either stop that container, or pick another port:"
+  echo "  echo 'MYPLACE_PORT_LAN=8323' >> .env && ./deploy.sh"
+  exit 1
+fi
+
+echo "building myplace ${GIT_SHA} (${BUILD_TIME}) on port ${LAN_PORT}"
 docker compose build
 docker compose up -d
 sleep 3
-echo "running: $(curl -s http://localhost:8322/api/version || echo '(not up yet)')"
+echo "running: $(curl -s "http://localhost:${LAN_PORT}/api/version" || echo '(not up yet)')"
+echo "open: http://big-kahuna-stor:${LAN_PORT}"

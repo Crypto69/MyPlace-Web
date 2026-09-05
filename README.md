@@ -54,6 +54,14 @@ echo 'MYPLACE_HOST=192.168.1.115' > .env      # the wall tablet
 
 Then open `http://big-kahuna-stor:8322` in a browser.
 
+If `deploy.sh` reports that port 8322 is already taken by another container,
+pick a free one and redeploy - nothing else needs changing:
+
+```bash
+echo 'MYPLACE_PORT_LAN=8323' >> .env
+./deploy.sh
+```
+
 ## Updating
 
 ```bash

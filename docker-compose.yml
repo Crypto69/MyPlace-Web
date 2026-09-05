@@ -9,8 +9,9 @@ services:
         GIT_SHA: ${GIT_SHA:-unknown}
         BUILD_TIME: ${BUILD_TIME:-unknown}
     ports:
-      # 8322: next free LAN port after stl2prism's 8321
-      - "8322:8000"
+      # LAN port. Override in .env if something else on the box has it:
+      #   echo 'MYPLACE_PORT_LAN=8323' >> .env
+      - "${MYPLACE_PORT_LAN:-8322}:8000"
     environment:
       # REQUIRED — the IP address of your MyPlace wall tablet.
       # Find it with: bash probe/discover.sh
