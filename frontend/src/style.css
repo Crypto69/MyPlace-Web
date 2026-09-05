@@ -1,0 +1,155 @@
+/* Accessibility-first sizing.
+   Targets are >= 120px tall, well beyond the 44px WCAG minimum, because this
+   app is driven by head-pointer / eye-gaze / switch rather than a fingertip.
+   Generous gaps mean an overshoot lands on nothing rather than on the wrong
+   control. No drag, no swipe, no long-press anywhere. */
+
+:root {
+  --bg: #12161c;
+  --panel: #1c232d;
+  --panel-hi: #263041;
+  --line: #35415a;
+  --text: #f2f5fa;
+  --muted: #9fb0c8;
+  --heat: #e8590c;
+  --heat-hi: #ff7a2f;
+  --on: #2f9e44;
+  --off: #495366;
+  --danger: #c92a2a;
+  --focus: #ffd43b;
+  --radius: 20px;
+  --gap: 20px;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #app {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Large base size; every rem below scales with it. */
+  font-size: 20px;
+}
+
+button {
+  font-family: inherit;
+  color: inherit;
+  border: 3px solid transparent;
+  border-radius: var(--radius);
+  background: var(--panel-hi);
+  cursor: pointer;
+  /* Big, unmissable targets. */
+  min-height: 120px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  padding: 16px;
+  transition: background 120ms ease, transform 60ms ease;
+  /* Stops a held switch or a stuck pointer from firing text selection. */
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+button:hover:not(:disabled) { background: var(--line); }
+button:active:not(:disabled) { transform: scale(0.98); }
+
+/* A thick, high-contrast focus ring: essential for switch scanning and
+   keyboard/tab driving, where the user must always see where they are. */
+button:focus-visible,
+a:focus-visible {
+  outline: 6px solid var(--focus);
+  outline-offset: 4px;
+}
+
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.wrap {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--gap);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+.card {
+  background: var(--panel);
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--gap);
+}
+
+.row { display: flex; gap: var(--gap); }
+.row > * { flex: 1; }
+
+h1 { font-size: 1.6rem; margin: 0 0 4px; }
+h2 { font-size: 1.15rem; margin: 0 0 12px; color: var(--muted); font-weight: 600; }
+
+/* ---- status ---- */
+.status { text-align: center; }
+.status .big { font-size: 4.5rem; font-weight: 800; line-height: 1.05; }
+.status .sub { font-size: 1.2rem; color: var(--muted); margin-top: 6px; }
+.dot {
+  display: inline-block;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  margin-right: 10px;
+  vertical-align: middle;
+  background: var(--off);
+}
+.dot.on { background: var(--on); }
+
+/* ---- main actions ---- */
+.btn-heat { background: var(--heat); min-height: 170px; font-size: 2rem; }
+.btn-heat:hover:not(:disabled) { background: var(--heat-hi); }
+.btn-off { background: var(--off); min-height: 170px; font-size: 2rem; }
+.btn-off:hover:not(:disabled) { background: #5b6779; }
+
+/* Shows which mode/preset is currently active. The ring marks the active
+   control; the button keeps its own colour, so "Heat On" stays orange while
+   it is the live state rather than going grey. */
+.active { border-color: var(--focus); }
+/* Only plain buttons (no colour of their own) get the fill. */
+button.active:not(.btn-heat):not(.btn-off) { background: var(--line); }
+
+.temp-display {
+  font-size: 3.5rem;
+  font-weight: 800;
+  text-align: center;
+  padding: 12px;
+  min-width: 160px;
+}
+.btn-step { font-size: 3rem; min-height: 130px; }
+
+/* ---- zones ---- */
+.zone {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  padding: 12px 0;
+  border-top: 2px solid var(--line);
+}
+.zone:first-of-type { border-top: none; }
+.zone .name { flex: 1; font-size: 1.3rem; font-weight: 700; }
+.zone .meta { color: var(--muted); font-size: 0.95rem; font-weight: 500; }
+.zone button { min-height: 100px; min-width: 150px; flex: 0 0 auto; }
+.zone .btn-open { background: var(--on); }
+.zone .btn-close { background: var(--off); }
+
+/* ---- messages ---- */
+.msg { padding: 16px; border-radius: var(--radius); font-size: 1.1rem; font-weight: 600; }
+.msg.err { background: var(--danger); }
+.msg.busy { background: var(--panel-hi); color: var(--muted); }
+
+.foot { color: var(--muted); font-size: 0.8rem; text-align: center; }
+
+/* Respect a user's reduced-motion setting. */
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+@media (max-width: 640px) {
+  .row { flex-direction: column; }
+}

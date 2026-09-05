@@ -1,0 +1,24 @@
+services:
+  myplace:
+    image: myplace:latest
+    build:
+      context: .
+      args:
+        # deploy.sh fills these in from git; a plain `docker compose build`
+        # leaves them 'unknown'
+        GIT_SHA: ${GIT_SHA:-unknown}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+    ports:
+      # 8322: next free LAN port after stl2prism's 8321
+      - "8322:8000"
+    environment:
+      # REQUIRED — the IP address of your MyPlace wall tablet.
+      # Find it with: bash probe/discover.sh
+      MYPLACE_HOST: "${MYPLACE_HOST:-}"
+      MYPLACE_PORT: "2025"
+      # Temperature limits the UI and API will not go outside.
+      MYPLACE_MIN_TEMP: "16"
+      MYPLACE_MAX_TEMP: "30"
+    # Tiny app; this is plenty and protects the box's other services.
+    mem_limit: 256m
+    restart: unless-stopped
