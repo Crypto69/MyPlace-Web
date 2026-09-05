@@ -39,7 +39,7 @@ if [ -f .env ]; then
   echo "using MYPLACE_HOST from .env"
 else
   echo "WARNING: no .env file — the app will start but cannot reach the tablet."
-  echo "  Create one with:  echo 'MYPLACE_HOST=192.168.1.50' > .env"
+  echo "  Create one with:  echo 'MYPLACE_HOST=192.168.1.115' > .env"
 fi
 
 echo "building myplace ${GIT_SHA} (${BUILD_TIME})"

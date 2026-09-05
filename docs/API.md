@@ -96,7 +96,7 @@ Read-only: `name`, `number`, `measuredTemp`, `type` (0 = damper-only, >0 = has s
 ## Worked examples
 
 ```bash
-TABLET=192.168.1.50
+TABLET=192.168.1.115
 
 # Read everything
 curl -s "http://$TABLET:2025/getSystemData" | jq .

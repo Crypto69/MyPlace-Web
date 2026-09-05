@@ -24,7 +24,7 @@ Docker Desktop running, then:
 
 ```bash
 ./try-locally.sh                  # demo against a fake heater
-./try-locally.sh 192.168.1.50     # against the real wall tablet
+./try-locally.sh 192.168.1.115     # against the real wall tablet
 ```
 
 Open `http://localhost:8322`. Stop it with `docker compose down`.
@@ -34,24 +34,21 @@ system involved. This is the same image the NAS runs.
 
 ## First-time setup
 
-**1. Find the tablet's IP address**, from any machine on the home network:
+The wall tablet is at **192.168.1.115**. Give it a DHCP reservation in the
+router so that address cannot change - if it moves, the app stops working and
+the reason is not obvious. On another system, `bash probe/discover.sh` finds
+the tablet (it must be awake).
 
-```bash
-bash probe/discover.sh
-```
-
-It prints something like `FOUND: http://192.168.1.50:2025`. Give the tablet a
-DHCP reservation in the router so the address does not change.
-
-**2. Deploy to the NAS** (follows the standard NAS deployment pattern):
+Deploy to the NAS - this follows the standard NAS deployment pattern, into the
+`myplace` share:
 
 ```bash
 ssh big-kahuna-stor
-cd /Volume5/<your-share>
-git clone https://github.com/Crypto69/myplace.git
-cd myplace
-chmod -R a+rX .                              # share ACLs strip modes
-echo 'MYPLACE_HOST=192.168.1.50' > .env      # the IP from step 1
+cd /Volume5/myplace
+git clone https://github.com/Crypto69/MyPlace-Web.git
+cd MyPlace-Web
+chmod -R a+rX .                               # share ACLs strip modes
+echo 'MYPLACE_HOST=192.168.1.115' > .env      # the wall tablet
 ./deploy.sh
 ```
 
@@ -61,7 +58,7 @@ Then open `http://big-kahuna-stor:8322` in a browser.
 
 ```bash
 ssh big-kahuna-stor
-cd /Volume5/<your-share>/myplace
+cd /Volume5/myplace/MyPlace-Web
 git pull
 chmod -R a+rX .          # ACLs strip modes on every pull
 ./deploy.sh

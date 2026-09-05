@@ -2,7 +2,7 @@
 # Run the app on this Mac under Docker, for trying it before deploying to the NAS.
 #
 #   ./try-locally.sh                 # against the fake tablet (no heater needed)
-#   ./try-locally.sh 192.168.1.50    # against the real wall tablet
+#   ./try-locally.sh 192.168.1.115    # against the real wall tablet
 #
 # Then open http://localhost:8322
 set -e
@@ -12,7 +12,7 @@ HOST="$1"
 
 if [ -z "$HOST" ]; then
   echo "No tablet IP given — starting the fake tablet for a demo run."
-  echo "(Pass the real IP to use your heating: ./try-locally.sh 192.168.1.50)"
+  echo "(Pass the real IP to use your heating: ./try-locally.sh 192.168.1.115)"
   if ! curl -s -m 2 http://localhost:2025/getSystemData >/dev/null 2>&1; then
     PY=python3
     [ -x .venv/bin/python ] && PY=.venv/bin/python
