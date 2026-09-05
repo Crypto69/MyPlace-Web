@@ -103,6 +103,52 @@ async def status():
         raise HTTPException(502, str(exc)) from exc
 
 
+@app.get("/api/diagnose")
+async def diagnose():
+    """Say *why* the tablet cannot be reached, from where this app runs.
+
+    'Asleep' and 'this host cannot route to the tablet' look identical to the
+    UI but need completely different fixes, so distinguish them here rather
+    than making the user guess.
+    """
+    import socket
+
+    result: dict[str, Any] = {"tablet": TABLET_HOST, "port": TABLET_PORT}
+
+    # Can we open a TCP connection at all?
+    sock = socket.socket()
+    sock.settimeout(4)
+    try:
+        sock.connect((TABLET_HOST, TABLET_PORT))
+        result["tcp"] = "open"
+    except socket.timeout:
+        result["tcp"] = "timeout"
+    except OSError as exc:
+        result["tcp"] = f"error: {exc}"
+    finally:
+        sock.close()
+
+    if result["tcp"] == "open":
+        try:
+            await _client().get_system_data()
+            result["api"] = "ok"
+            result["diagnosis"] = "the tablet is reachable and answering"
+        except AirconError as exc:
+            result["api"] = str(exc)
+            result["diagnosis"] = "the tablet answers but is not returning data"
+    elif result["tcp"] == "timeout":
+        result["diagnosis"] = (
+            "no reply from the tablet. It is asleep, or this machine is on a "
+            "network segment that cannot reach it."
+        )
+    else:
+        result["diagnosis"] = (
+            "the connection was refused or the address is unreachable from "
+            "this machine - a routing or firewall problem, not a sleeping tablet"
+        )
+    return result
+
+
 @app.get("/api/raw")
 async def raw():
     """Unmodified getSystemData — handy for checking what your unit supports."""
