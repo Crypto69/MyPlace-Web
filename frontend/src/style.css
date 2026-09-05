@@ -150,6 +150,20 @@ button.active:not(.btn-heat):not(.btn-off) { background: var(--line); }
 .zone:first-of-type { border-top: none; }
 .zone .name { flex: 1; font-size: 1.1rem; font-weight: 700; }
 .zone .meta { color: var(--muted); font-size: 0.95rem; font-weight: 500; }
+/* Marks the room whose target actually drives the unit. */
+.tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--heat);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
 .zone button { min-height: 64px; min-width: 108px; flex: 0 0 auto; }
 .zone .btn-open { background: var(--on); }
 .zone .btn-close { background: var(--off); }

@@ -49,9 +49,30 @@ const post = (path, body) =>
     .then((r) => { if (r) status.value = r })
 
 const heatOn = (temp) => post('/api/heat-on', { temp })
+
+// A preset has to do both: make sure the system is on and heating, then set
+// the target on the room that actually governs it.
+async function quickSet(temp) {
+  await heatOn(temp)
+  if (controlling.value) await setZoneTemp(controlling.value.id, temp)
+}
 const turnOff = () => post('/api/power/off')
 const setTemp = (temp) => post('/api/temp', { temp })
 const setZone = (id, change) => post(`/api/zone/${id}`, change)
+const setZoneTemp = (id, temp) => post(`/api/zone/${id}/temp`, { temp })
+
+// The unit follows one zone (myZone); its target is what actually drives the
+// heating, so that is the number the UI has to put front and centre.
+const controlling = computed(() =>
+  status.value?.zones?.find((z) => z.isControlling) ?? null,
+)
+const roomTarget = computed(() => controlling.value?.setTemp ?? target.value)
+const roomUp = () =>
+  controlling.value &&
+  setZoneTemp(controlling.value.id, Math.min(roomTarget.value + step.value, version.value.maxTemp ?? 30))
+const roomDown = () =>
+  controlling.value &&
+  setZoneTemp(controlling.value.id, Math.max(roomTarget.value - step.value, version.value.minTemp ?? 16))
 
 const isOn = computed(() => status.value?.state === 'on')
 const isHeating = computed(() => isOn.value && status.value?.mode === 'heat')
@@ -84,12 +105,16 @@ onUnmounted(() => clearInterval(poll))
       <h1>{{ status?.name || 'Heating' }}</h1>
       <div class="big">
         <span class="dot" :class="{ on: isOn }"></span>
-        <span v-if="isHeating">{{ fmt(target) }}&deg;</span>
+        <span v-if="isHeating">{{ fmt(roomTarget) }}&deg;</span>
         <span v-else-if="isOn">On</span>
         <span v-else>Off</span>
       </div>
       <div class="sub">
-        <span v-if="isHeating">Heating to {{ fmt(target) }}&deg;</span>
+        <span v-if="isHeating && controlling">
+          {{ controlling.name }} &middot; now {{ fmt(controlling.measuredTemp) }}&deg;,
+          heating to {{ fmt(roomTarget) }}&deg;
+        </span>
+        <span v-else-if="isHeating">Heating to {{ fmt(target) }}&deg;</span>
         <span v-else-if="isOn">Running in {{ status?.mode }} mode</span>
         <span v-else>The heating is off</span>
       </div>
@@ -105,7 +130,7 @@ onUnmounted(() => clearInterval(poll))
         class="btn-heat"
         :class="{ active: isHeating }"
         :disabled="busy"
-        @click="heatOn(target)"
+        @click="quickSet(roomTarget)"
       >
         Heat On
       </button>
@@ -120,11 +145,22 @@ onUnmounted(() => clearInterval(poll))
     </div>
 
     <div class="card">
-      <h2>Temperature</h2>
+      <h2 v-if="controlling">Temperature in {{ controlling.name }}</h2>
+      <h2 v-else>Temperature</h2>
       <div class="row" style="align-items: center">
-        <button class="btn-step" :disabled="busy" @click="stepDown" :aria-label="`Cooler by ${step} degree`">&minus;</button>
-        <div class="temp-display">{{ fmt(target) }}&deg;</div>
-        <button class="btn-step" :disabled="busy" @click="stepUp" :aria-label="`Warmer by ${step} degree`">+</button>
+        <button
+          class="btn-step"
+          :disabled="busy"
+          @click="controlling ? roomDown() : stepDown()"
+          :aria-label="`Cooler by ${step} degree`"
+        >&minus;</button>
+        <div class="temp-display">{{ fmt(roomTarget) }}&deg;</div>
+        <button
+          class="btn-step"
+          :disabled="busy"
+          @click="controlling ? roomUp() : stepUp()"
+          :aria-label="`Warmer by ${step} degree`"
+        >+</button>
       </div>
     </div>
 
@@ -134,9 +170,9 @@ onUnmounted(() => clearInterval(poll))
         <button
           v-for="t in PRESETS"
           :key="t"
-          :class="{ active: isHeating && Number(target) === t }"
+          :class="{ active: isHeating && Number(roomTarget) === t }"
           :disabled="busy"
-          @click="heatOn(t)"
+          @click="quickSet(t)"
         >
           {{ t }}&deg;
         </button>
@@ -148,6 +184,7 @@ onUnmounted(() => clearInterval(poll))
       <div class="zone" v-for="z in status.zones" :key="z.id">
         <div class="name">
           {{ z.name }}
+          <span v-if="z.isControlling" class="tag">controls heating</span>
           <div class="meta">
             <span v-if="z.measuredTemp !== null && z.measuredTemp !== undefined">
               now {{ fmt(z.measuredTemp) }}&deg;

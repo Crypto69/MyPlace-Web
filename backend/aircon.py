@@ -138,6 +138,7 @@ def summarize(system: dict) -> dict:
         zones.append(
             {
                 "id": zid,
+                "number": z.get("number"),
                 "name": z.get("name") or zid,
                 "state": z.get("state"),
                 "value": z.get("value"),
@@ -146,6 +147,12 @@ def summarize(system: dict) -> dict:
                 "hasSensor": has_sensor,
             }
         )
+
+    # myZone names the zone the unit actually follows. Its target is the one
+    # that controls the heating; the system-level setTemp does not.
+    my_zone = info.get("myZone")
+    for z in zones:
+        z["isControlling"] = my_zone is not None and z.get("number") == my_zone
 
     return {
         "acId": key,
