@@ -117,6 +117,33 @@ Built for driving with a gyroscopic head mouse:
 To resize everything, change `--gap`, `--radius` and the `font-size` on `body`
 in `frontend/src/style.css`; the rest is in `rem` and scales with them.
 
+## The wall tablet must stay awake
+
+The local API is served by the MyPlace app running on the wall tablet, so it
+only answers while that tablet is awake and on the network. When the tablet
+sleeps it appears to leave the network entirely - it stops answering ping, its
+MAC never resolves, and port 2025 is closed.
+
+On the tablet (an ordinary Android device), set:
+
+- **Settings -> Display -> Screen timeout: Never**
+- **Settings -> Wi-Fi -> Advanced -> Keep Wi-Fi on during sleep: Always**
+
+It is wall-powered, so there is no battery cost. If it does go to sleep, the
+app says so plainly rather than showing a connection error, and reconnects by
+itself once the tablet is awake.
+
+## Zoned systems: which temperature actually matters
+
+A zoned system has a system-level `setTemp` *and* a target per zone. The unit
+follows the single zone named by `info.myZone` - changing the system-level
+target alone does nothing the user can feel.
+
+The UI therefore shows and changes the **controlling room's** target, names
+that room, and tags it in the room list. `summarize()` marks it with
+`isControlling`; if no zone claims it, the app falls back to the system-level
+target so an unzoned system still behaves sensibly.
+
 ## Security
 
 The tablet API has **no authentication** — anyone who can reach it on the

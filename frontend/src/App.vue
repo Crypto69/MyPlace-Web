@@ -23,11 +23,25 @@ async function call(path, opts = {}) {
     if (!res.ok) throw new Error(body.detail || `Error ${res.status}`)
     return body
   } catch (e) {
-    error.value = e.message || 'Something went wrong'
+    error.value = friendly(e.message || 'Something went wrong')
     return null
   } finally {
     busy.value = false
   }
+}
+
+// The wall tablet leaves the network when it sleeps, and the raw failure
+// ("cannot reach the tablet at 192.168.1.115") reads as the app being broken.
+// Name the actual cause and the actual fix instead.
+const ASLEEP =
+  'The wall tablet is not responding - it is probably asleep. ' +
+  'Wake its screen and this will reconnect on its own.'
+
+function friendly(message) {
+  if (/cannot reach|not responding|timed out|Failed to fetch|NetworkError/i.test(message)) {
+    return ASLEEP
+  }
+  return message
 }
 
 async function refresh() {
@@ -40,7 +54,7 @@ async function refresh() {
     status.value = body
     error.value = ''
   } catch (e) {
-    error.value = e.message || 'Cannot reach the heating system'
+    error.value = friendly(e.message || 'Cannot reach the heating system')
   }
 }
 
