@@ -85,5 +85,6 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 2025
-    print(f"fake MyPlace tablet listening on http://127.0.0.1:{port}")
-    HTTPServer(("127.0.0.1", port), Handler).serve_forever()
+    print(f"fake MyPlace tablet listening on port {port}")
+    # 0.0.0.0 so a container (or another machine) can reach the test double
+    HTTPServer(("0.0.0.0", port), Handler).serve_forever()
