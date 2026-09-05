@@ -46,7 +46,7 @@ button {
   font-size: 1.2rem;
   font-weight: 700;
   padding: 16px;
-  transition: background 120ms ease, transform 60ms ease;
+  transition: background 120ms ease, filter 60ms ease;
   /* Stops a held switch or a stuck pointer from firing text selection. */
   user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -54,7 +54,9 @@ button {
 }
 
 button:hover:not(:disabled) { background: var(--line); }
-button:active:not(:disabled) { transform: scale(0.98); }
+/* No transform on press: shrinking the button moves its edges under a
+   head-mouse pointer. A brightness flash gives the same feedback, still. */
+button:active:not(:disabled) { filter: brightness(1.25); }
 
 /* A thick, high-contrast focus ring: essential for switch scanning and
    keyboard/tab driving, where the user must always see where they are. */
@@ -90,8 +92,21 @@ h2 { font-size: 1rem; margin: 0 0 12px; color: var(--muted); font-weight: 600; }
 
 /* ---- status ---- */
 .status { text-align: center; }
-.status .big { font-size: 3.2rem; font-weight: 800; line-height: 1.05; }
-.status .sub { font-size: 1.05rem; color: var(--muted); margin-top: 6px; }
+/* Fixed heights: the readout swaps between "21.0" and "Off" and the caption
+   text changes length, so both are pinned to stop the card resizing under
+   the buttons below it. */
+.status .big {
+  font-size: 3.2rem;
+  font-weight: 800;
+  line-height: 1.05;
+  min-height: 3.4rem;
+}
+.status .sub {
+  font-size: 1.05rem;
+  color: var(--muted);
+  margin-top: 6px;
+  min-height: 1.5rem;
+}
 .dot {
   display: inline-block;
   width: 14px; height: 14px;
@@ -140,7 +155,22 @@ button.active:not(.btn-heat):not(.btn-off) { background: var(--line); }
 .zone .btn-close { background: var(--off); }
 
 /* ---- messages ---- */
-.msg { padding: 16px; border-radius: var(--radius); font-size: 1.1rem; font-weight: 600; }
+/* The slot always occupies its space, whether or not a message is showing.
+   Without it, the "Working..." box appears and disappears on every click and
+   shoves the whole page down and back - which reads as the screen jumping,
+   and moves the button out from under a head-mouse pointer mid-click. */
+.msg-slot {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+}
+.msg {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  font-size: 1rem;
+  font-weight: 600;
+}
 .msg.err { background: var(--danger); }
 .msg.busy { background: var(--panel-hi); color: var(--muted); }
 
