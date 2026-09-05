@@ -18,6 +18,20 @@ source for every claim.
 browser  ->  this app (NAS :8322)  ->  wall tablet (:2025)  ->  heating
 ```
 
+## Try it first, on your own machine
+
+Docker Desktop running, then:
+
+```bash
+./try-locally.sh                  # demo against a fake heater
+./try-locally.sh 192.168.1.50     # against the real wall tablet
+```
+
+Open `http://localhost:8322`. Stop it with `docker compose down`.
+
+Without an IP it starts a fake tablet, so the app can be tried with no heating
+system involved. This is the same image the NAS runs.
+
 ## First-time setup
 
 **1. Find the tablet's IP address**, from any machine on the home network:
@@ -116,6 +130,7 @@ network can control the heating. This app adds none, so:
 ## Layout
 
 ```
+try-locally.sh  run it on your own machine, with or without a real heater
 backend/     FastAPI app; aircon.py is the tablet client
 frontend/    Vue 3 UI (built into the image, served by the backend)
 probe/       discover.sh (find the tablet), fake_tablet.py (test double)
