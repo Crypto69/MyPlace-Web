@@ -1,0 +1,11 @@
+.git
+.DS_Store
+__pycache__
+*.pyc
+analysis
+docs
+probe
+data
+*.apk
+frontend/node_modules
+frontend/dist
