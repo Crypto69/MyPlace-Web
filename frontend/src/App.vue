@@ -57,10 +57,18 @@ const isOn = computed(() => status.value?.state === 'on')
 const isHeating = computed(() => isOn.value && status.value?.mode === 'heat')
 const target = computed(() => status.value?.setTemp ?? 20)
 
-const stepUp = () => setTemp(Math.min(target.value + 0.5, version.value.maxTemp ?? 30))
-const stepDown = () => setTemp(Math.max(target.value - 0.5, version.value.minTemp ?? 16))
+// The step comes from the backend: this system only accepts whole degrees,
+// and a half-degree target is silently ignored by the tablet.
+const step = computed(() => version.value.tempStep ?? 1)
+const stepUp = () => setTemp(Math.min(target.value + step.value, version.value.maxTemp ?? 30))
+const stepDown = () => setTemp(Math.max(target.value - step.value, version.value.minTemp ?? 16))
 
-const fmt = (t) => (t === null || t === undefined ? '--' : Number(t).toFixed(1))
+const fmt = (t) => {
+  if (t === null || t === undefined) return '--'
+  const n = Number(t)
+  // Whole-degree systems should not show a pointless '.0'
+  return Number.isInteger(n) ? String(n) : n.toFixed(1)
+}
 
 onMounted(async () => {
   version.value = (await call('/api/version')) || {}
@@ -114,9 +122,9 @@ onUnmounted(() => clearInterval(poll))
     <div class="card">
       <h2>Temperature</h2>
       <div class="row" style="align-items: center">
-        <button class="btn-step" :disabled="busy" @click="stepDown" aria-label="Warmer by half a degree">&minus;</button>
+        <button class="btn-step" :disabled="busy" @click="stepDown" :aria-label="`Cooler by ${step} degree`">&minus;</button>
         <div class="temp-display">{{ fmt(target) }}&deg;</div>
-        <button class="btn-step" :disabled="busy" @click="stepUp" aria-label="Cooler by half a degree">+</button>
+        <button class="btn-step" :disabled="busy" @click="stepUp" :aria-label="`Warmer by ${step} degree`">+</button>
       </div>
     </div>
 

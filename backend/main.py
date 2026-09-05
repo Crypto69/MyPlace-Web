@@ -7,6 +7,7 @@ must never be exposed to the internet.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from pathlib import Path
@@ -37,6 +38,10 @@ BUILD_TIME = os.environ.get("APP_BUILD_TIME", "unknown")
 # Guard rails so a typo or a stuck button can't ask for something silly.
 MIN_TEMP = float(os.environ.get("MYPLACE_MIN_TEMP", "16"))
 MAX_TEMP = float(os.environ.get("MYPLACE_MAX_TEMP", "30"))
+# Smallest change this system accepts. Some units do 0.5, this one only whole
+# degrees - a half-degree target is silently ignored by the tablet, which looks
+# to the user like the app not working.
+TEMP_STEP = float(os.environ.get("MYPLACE_TEMP_STEP", "1"))
 
 app = FastAPI(title="MyPlace Heating")
 client = AirconClient(TABLET_HOST, TABLET_PORT) if TABLET_HOST else None
@@ -55,9 +60,9 @@ def _client() -> AirconClient:
 
 
 def _clamp(temp: float) -> float:
-    """Keep the target inside a sane range, rounded to the 0.5° the system uses."""
+    """Keep the target in range and on a step the system will actually accept."""
     temp = max(MIN_TEMP, min(MAX_TEMP, temp))
-    return round(temp * 2) / 2
+    return round(temp / TEMP_STEP) * TEMP_STEP
 
 
 class TempBody(BaseModel):
@@ -86,6 +91,7 @@ async def version():
         "tablet": f"{TABLET_HOST}:{TABLET_PORT}" if TABLET_HOST else None,
         "minTemp": MIN_TEMP,
         "maxTemp": MAX_TEMP,
+        "tempStep": TEMP_STEP,
     }
 
 
@@ -106,11 +112,17 @@ async def raw():
         raise HTTPException(502, str(exc)) from exc
 
 
+# The tablet applies a change a moment after acknowledging it, so a status read
+# taken immediately still shows the old value. Wait briefly before reading back.
+SETTLE_SECONDS = float(os.environ.get("MYPLACE_SETTLE", "1.5"))
+
+
 async def _send(info: dict) -> dict:
     c = _client()
     try:
         ac = summarize(await c.get_system_data())["acId"]
         await c.set_aircon({ac: {"info": info}})
+        await asyncio.sleep(SETTLE_SECONDS)
         return summarize(await c.get_system_data())
     except AirconError as exc:
         raise HTTPException(502, str(exc)) from exc
@@ -176,6 +188,7 @@ async def zone(zone_id: str, body: ZoneBody):
     try:
         ac = summarize(await c.get_system_data())["acId"]
         await c.set_aircon({ac: {"zones": {zone_id: change}}})
+        await asyncio.sleep(SETTLE_SECONDS)
         return summarize(await c.get_system_data())
     except AirconError as exc:
         raise HTTPException(502, str(exc)) from exc
