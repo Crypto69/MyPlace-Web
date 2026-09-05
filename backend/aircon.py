@@ -29,6 +29,10 @@ ZONE_STATES = {"open", "close"}
 # can't overlap and confuse it.
 _lock = asyncio.Lock()
 
+# It also drops the odd request while applying a change; retry before giving up.
+RETRIES = 5
+RETRY_DELAY = 0.8
+
 
 class AirconError(RuntimeError):
     """The tablet could not be reached or rejected the request."""
@@ -45,20 +49,53 @@ class AirconClient:
         return f"http://{self.host}:{self.port}"
 
     async def _get(self, endpoint: str, params: dict[str, str] | None = None) -> dict:
-        url = f"{self.base}/{endpoint}"
-        async with _lock:
-            try:
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    resp = await client.get(url, params=params)
-                    resp.raise_for_status()
-                    text = resp.text
-            except httpx.HTTPError as exc:
-                raise AirconError(f"cannot reach the tablet at {self.host}: {exc}") from exc
+        """One request, retried on the tablet's occasional hiccups.
 
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError as exc:
-            raise AirconError(f"tablet returned non-JSON: {text[:200]!r}") from exc
+        The tablet is a small embedded device and will sometimes drop a
+        connection or return a truncated body while it is busy applying a
+        change. Those are transient, so retry briefly rather than surfacing
+        an error to someone who just wants the heating on.
+        """
+        url = f"{self.base}/{endpoint}"
+        last: Exception | None = None
+
+        for attempt in range(RETRIES):
+            if attempt:
+                await asyncio.sleep(RETRY_DELAY * attempt)
+            async with _lock:
+                try:
+                    async with httpx.AsyncClient(timeout=self.timeout) as client:
+                        resp = await client.get(url, params=params)
+                        resp.raise_for_status()
+                        text = resp.text
+                except httpx.HTTPError as exc:
+                    last = exc
+                    log.warning("tablet request failed (%s/%s): %s", attempt + 1, RETRIES, exc)
+                    continue
+
+            try:
+                data = json.loads(text)
+            except json.JSONDecodeError as exc:
+                # A truncated body: the tablet was mid-update. Worth retrying.
+                last = exc
+                log.warning("tablet returned partial JSON (%s/%s)", attempt + 1, RETRIES)
+                continue
+
+            # For a short window after a change, the tablet answers 200 with a
+            # bare "{}" while it rebuilds its state. That parses fine but has no
+            # data in it, so it has to be caught here rather than by the JSON
+            # decoder, and retried like any other transient failure.
+            if endpoint == "getSystemData" and "aircons" not in data:
+                last = AirconError("tablet returned an empty state")
+                log.warning("tablet state not ready (%s/%s)", attempt + 1, RETRIES)
+                continue
+
+            return data
+
+        raise AirconError(
+            f"the heating system at {self.host} is not responding properly "
+            f"({type(last).__name__})"
+        ) from last
 
     async def get_system_data(self) -> dict:
         """Full system state: every aircon unit, every zone."""
