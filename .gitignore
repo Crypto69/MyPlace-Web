@@ -8,3 +8,5 @@ __pycache__/
 .DS_Store
 dist/
 data/
+# Playwright CLI output (may contain credentials)
+.playwright-cli/

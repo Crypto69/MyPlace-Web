@@ -87,8 +87,10 @@ onUnmounted(() => clearInterval(poll))
       </div>
     </div>
 
-    <div v-if="error" class="msg err" role="alert">{{ error }}</div>
-    <div v-else-if="busy" class="msg busy" role="status">Working&hellip;</div>
+    <div class="msg-slot">
+      <div v-if="error" class="msg err" role="alert">{{ error }}</div>
+      <div v-else-if="busy" class="msg busy" role="status">Working&hellip;</div>
+    </div>
 
     <div class="row">
       <button
