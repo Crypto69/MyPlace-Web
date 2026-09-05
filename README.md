@@ -34,24 +34,21 @@ system involved. This is the same image the NAS runs.
 
 ## First-time setup
 
-**1. Find the tablet's IP address**, from any machine on the home network:
+The wall tablet is at **192.168.1.x**. Give it a DHCP reservation in the
+router so that address cannot change - if it moves, the app stops working and
+the reason is not obvious. On another system, `bash probe/discover.sh` finds
+the tablet (it must be awake).
 
-```bash
-bash probe/discover.sh
-```
-
-It prints something like `FOUND: http://192.168.1.x:2025`. Give the tablet a
-DHCP reservation in the router so the address does not change.
-
-**2. Deploy to the NAS** (follows the standard NAS deployment pattern):
+Deploy to the NAS - this follows the standard NAS deployment pattern, into the
+`myplace` share:
 
 ```bash
 ssh your-nas-name
-cd /VolumeN/<your-share>
-git clone https://github.com/Crypto69/myplace.git
-cd myplace
-chmod -R a+rX .                              # share ACLs strip modes
-echo 'MYPLACE_HOST=192.168.1.x' > .env      # the IP from step 1
+cd /VolumeN/myplace
+git clone https://github.com/Crypto69/MyPlace-Web.git
+cd MyPlace-Web
+chmod -R a+rX .                               # share ACLs strip modes
+echo 'MYPLACE_HOST=192.168.1.x' > .env      # the wall tablet
 ./deploy.sh
 ```
 
@@ -61,7 +58,7 @@ Then open `http://your-nas-name:8322` in a browser.
 
 ```bash
 ssh your-nas-name
-cd /VolumeN/<your-share>/myplace
+cd /VolumeN/myplace/MyPlace-Web
 git pull
 chmod -R a+rX .          # ACLs strip modes on every pull
 ./deploy.sh
