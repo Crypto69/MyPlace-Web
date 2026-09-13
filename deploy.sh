@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 # usual places, and if all else fails read the commit straight from .git.
 GIT=""
 for c in git /usr/bin/git /usr/local/bin/git /opt/bin/git \
-         /VolumeN/@apps/git/bin/git; do
+         /Volume*/@apps/git/bin/git; do
   if command -v "$c" >/dev/null 2>&1; then GIT="$c"; break; fi
 done
 
@@ -94,4 +94,4 @@ docker compose build
 docker compose up -d
 sleep 3
 echo "running: $(curl -s "http://localhost:${LAN_PORT}/api/version" || echo '(not up yet)')"
-echo "open: http://your-nas-name:${LAN_PORT}"
+echo "open: http://$(hostname):${LAN_PORT}"

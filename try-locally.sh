@@ -2,7 +2,7 @@
 # Run the app on this Mac under Docker, for trying it before deploying to the NAS.
 #
 #   ./try-locally.sh                 # against the fake tablet (no heater needed)
-#   ./try-locally.sh 192.168.1.x    # against the real wall tablet
+#   ./try-locally.sh 192.168.1.x     # against the real wall tablet
 #
 # Then open http://localhost:8322
 set -e

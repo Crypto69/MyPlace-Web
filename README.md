@@ -5,7 +5,7 @@ heating system from a browser on the home network. Built for hands-free use
 with a head mouse: comfortable targets, no dragging, no swiping, no
 long-presses.
 
-Runs in Docker on the TerraMaster NAS. **LAN only** — see Security.
+Runs in Docker on a NAS. **LAN only** — see Security.
 
 ## How it works
 
@@ -24,7 +24,7 @@ Docker Desktop running, then:
 
 ```bash
 ./try-locally.sh                  # demo against a fake heater
-./try-locally.sh 192.168.1.x     # against the real wall tablet
+./try-locally.sh 192.168.1.x      # against the real wall tablet
 ```
 
 Open `http://localhost:8322`. Stop it with `docker compose down`.
@@ -34,21 +34,22 @@ system involved. This is the same image the NAS runs.
 
 ## First-time setup
 
-The wall tablet is at **192.168.1.x**. Give it a DHCP reservation in the
-router so that address cannot change - if it moves, the app stops working and
-the reason is not obvious. On another system, `bash probe/discover.sh` finds
-the tablet (it must be awake).
+The wall tablet sits on a private LAN address, something like
+**192.168.1.x**. Give it a DHCP reservation in the router so that address
+cannot change - if it moves, the app stops working and the reason is not
+obvious. On another system, `bash probe/discover.sh` finds the tablet (it must
+be awake).
 
 Deploy to the NAS - this follows the standard NAS deployment pattern, into the
 `myplace` share:
 
 ```bash
 ssh your-nas-name
-cd /VolumeN/myplace
+cd /VolumeN/myplace            # whichever volume holds the share
 git clone https://github.com/Crypto69/MyPlace-Web.git
 cd MyPlace-Web
-chmod -R a+rX .                               # share ACLs strip modes
-echo 'MYPLACE_HOST=192.168.1.x' > .env      # the wall tablet
+chmod -R a+rX .                             # share ACLs strip modes
+echo 'MYPLACE_HOST=192.168.1.x' > .env      # the wall tablet's real IP
 ./deploy.sh
 ```
 
