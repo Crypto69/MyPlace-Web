@@ -53,6 +53,10 @@ echo 'MYPLACE_HOST=192.168.1.x' > .env      # the wall tablet's real IP
 ./deploy.sh
 ```
 
+If the tablet's address changes later, fix it in the app: **Tablet address**
+at the bottom of the page. The saved address wins over `MYPLACE_HOST` and is
+kept in `data/settings.json`, so it survives redeploys.
+
 `deploy.sh` prints the URL to open, normally
 `http://your-nas-name:8322`.
 
@@ -94,6 +98,7 @@ To point at the real system instead, set `MYPLACE_HOST` to the tablet's IP.
 | GET | `/api/status` | – | Current state, tidied for the UI |
 | GET | `/api/raw` | – | Unmodified `getSystemData` |
 | GET | `/api/version` | – | Build SHA, tablet address, temp limits |
+| GET / POST | `/api/tablet` | `{"host": "192.168.1.20"}` | Read / change the tablet's address (saved) |
 | POST | `/api/heat-on` | `{"temp": 21}` | On + heat + temperature, one request |
 | POST | `/api/power/on\|off` | – | Power |
 | POST | `/api/mode` | `{"mode": "heat"}` | cool/heat/vent/auto/dry/myauto |

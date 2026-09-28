@@ -188,6 +188,26 @@ button.active:not(.btn-heat):not(.btn-off) { background: var(--line); }
 .msg.err { background: var(--danger); }
 .msg.busy { background: var(--panel-hi); color: var(--muted); }
 
+/* ---- tablet address ---- */
+input {
+  font: inherit;
+  font-size: 1.2rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 3px solid var(--line);
+  border-radius: var(--radius);
+  min-height: 68px;
+  padding: 0 16px;
+  min-width: 0;
+}
+input:focus-visible { outline: 4px solid var(--focus); outline-offset: 3px; }
+.host-row > input { flex: 2; }
+/* Stays in the column on phones, where .row stacks. */
+@media (max-width: 640px) { .row.host-row { flex-direction: row; } }
+/* Reserved height, so the message appearing never moves the Save button. */
+.host-msg { min-height: 1.6rem; margin-top: 10px; color: var(--muted); }
+.host-msg.err { color: #ff8787; }
+
 .foot { color: var(--muted); font-size: 0.8rem; text-align: center; }
 
 /* Respect a user's reduced-motion setting. */

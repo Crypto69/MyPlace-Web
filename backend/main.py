@@ -8,9 +8,13 @@ must never be exposed to the internet.
 from __future__ import annotations
 
 import asyncio
+import ipaddress
+import json
 import logging
 import os
+import re
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
@@ -30,7 +34,6 @@ from .aircon import (
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
-TABLET_HOST = os.environ.get("MYPLACE_HOST", "")
 TABLET_PORT = int(os.environ.get("MYPLACE_PORT", "2025"))
 BUILD_SHA = os.environ.get("APP_BUILD_SHA", "unknown")
 BUILD_TIME = os.environ.get("APP_BUILD_TIME", "unknown")
@@ -46,19 +49,61 @@ TEMP_STEP = float(os.environ.get("MYPLACE_TEMP_STEP", "1"))
 app = FastAPI(title="MyPlace Heating")
 # The tablet's wifi is slow to wake, so the default timeout is generous.
 TIMEOUT = float(os.environ.get("MYPLACE_TIMEOUT", "20"))
-client = AirconClient(TABLET_HOST, TABLET_PORT, TIMEOUT) if TABLET_HOST else None
 
-FRONTEND = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+ROOT = Path(__file__).resolve().parent.parent
+FRONTEND = ROOT / "frontend" / "dist"
+
+# The tablet's DHCP address can change when it reboots, so the address is
+# editable from the UI. A saved address wins over MYPLACE_HOST, which is only
+# the starting value; it lives in data/ (a mounted volume) so it survives
+# redeploys.
+SETTINGS = Path(os.environ.get("MYPLACE_DATA", ROOT / "data")) / "settings.json"
+
+
+def _load_host() -> str:
+    try:
+        saved = json.loads(SETTINGS.read_text()).get("host", "")
+        if saved:
+            return saved
+    except FileNotFoundError:
+        pass
+    except (OSError, ValueError) as exc:
+        log.warning("ignoring unreadable %s: %s", SETTINGS, exc)
+    return os.environ.get("MYPLACE_HOST", "")
+
+
+def _save_host(host: str) -> None:
+    SETTINGS.parent.mkdir(parents=True, exist_ok=True)
+    tmp = SETTINGS.with_suffix(".tmp")
+    tmp.write_text(json.dumps({"host": host}))
+    tmp.replace(SETTINGS)  # atomic, so a crash mid-write can't lose the address
+
+
+tablet_host = _load_host()
+client = AirconClient(tablet_host, TABLET_PORT, TIMEOUT) if tablet_host else None
 
 
 def _client() -> AirconClient:
     if client is None:
         raise HTTPException(
             503,
-            "MYPLACE_HOST is not set. Put the tablet's IP address in "
-            "docker-compose.yml and restart.",
+            "The tablet's address is not set. Enter it under "
+            "'Tablet address' at the bottom of the page.",
         )
     return client
+
+
+_HOSTNAME = re.compile(r"^(?=.{1,253}$)[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+                       r"(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$")
+
+
+def _valid_host(host: str) -> bool:
+    try:
+        ipaddress.ip_address(host)
+        return True
+    except ValueError:
+        # All-digit dotted strings that failed above are mistyped IPs, not names.
+        return bool(_HOSTNAME.match(host)) and not re.fullmatch(r"[\d.]+", host)
 
 
 def _clamp(temp: float) -> float:
@@ -79,6 +124,10 @@ class FanBody(BaseModel):
     fan: str
 
 
+class TabletBody(BaseModel):
+    host: str
+
+
 class ZoneBody(BaseModel):
     state: str | None = None
     setTemp: float | None = None
@@ -90,11 +139,30 @@ async def version():
     return {
         "sha": BUILD_SHA,
         "buildTime": BUILD_TIME,
-        "tablet": f"{TABLET_HOST}:{TABLET_PORT}" if TABLET_HOST else None,
+        "tablet": f"{tablet_host}:{TABLET_PORT}" if tablet_host else None,
         "minTemp": MIN_TEMP,
         "maxTemp": MAX_TEMP,
         "tempStep": TEMP_STEP,
     }
+
+
+@app.get("/api/tablet")
+async def get_tablet():
+    return {"host": tablet_host, "port": TABLET_PORT}
+
+
+@app.post("/api/tablet")
+async def set_tablet(body: TabletBody):
+    """Point the app at a new tablet address, and remember it."""
+    global client, tablet_host
+    host = body.host.strip()
+    if not _valid_host(host):
+        raise HTTPException(400, f"'{host}' is not an IP address, like 192.168.1.20")
+    _save_host(host)
+    tablet_host = host
+    client = AirconClient(host, TABLET_PORT, TIMEOUT)
+    log.info("tablet address changed to %s", host)
+    return {"host": tablet_host, "port": TABLET_PORT}
 
 
 @app.get("/api/status")
@@ -115,7 +183,8 @@ async def diagnose():
     """
     import socket
 
-    result: dict[str, Any] = {"tablet": TABLET_HOST, "port": TABLET_PORT}
+    host = _client().host
+    result: dict[str, Any] = {"tablet": host, "port": TABLET_PORT}
 
     # Can we open a TCP connection at all?
     sock = socket.socket()
@@ -123,7 +192,7 @@ async def diagnose():
     # false failure on a link that actually works.
     sock.settimeout(TIMEOUT)
     try:
-        sock.connect((TABLET_HOST, TABLET_PORT))
+        sock.connect((host, TABLET_PORT))
         result["tcp"] = "open"
     except socket.timeout:
         result["tcp"] = "timeout"

@@ -12,8 +12,12 @@ services:
       # LAN port. Override in .env if something else on the box has it:
       #   echo 'MYPLACE_PORT_LAN=8323' >> .env
       - "${MYPLACE_PORT_LAN:-8322}:8000"
+    volumes:
+      # Holds the tablet address saved from the UI, so it survives redeploys.
+      - ./data:/app/data
     environment:
-      # REQUIRED — the IP address of your MyPlace wall tablet.
+      # The IP address of your MyPlace wall tablet, used until one is saved
+      # from the UI ("Tablet address" at the bottom of the page).
       # Find it with: bash probe/discover.sh
       MYPLACE_HOST: "${MYPLACE_HOST:-}"
       MYPLACE_PORT: "2025"

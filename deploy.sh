@@ -38,8 +38,8 @@ export GIT_SHA BUILD_TIME
 if [ -f .env ]; then
   echo "using MYPLACE_HOST from .env"
 else
-  echo "WARNING: no .env file — the app will start but cannot reach the tablet."
-  echo "  Create one with:  echo 'MYPLACE_HOST=192.168.1.x' > .env"
+  echo "note: no .env file. Set the tablet's IP in the app itself, under"
+  echo "  'Tablet address' at the bottom of the page."
 fi
 
 # --- pick a LAN port ------------------------------------------------------

@@ -35,7 +35,8 @@ async function call(path, opts = {}) {
 // Name the actual cause and the actual fix instead.
 const ASLEEP =
   'The wall tablet is not responding - it is probably asleep. ' +
-  'Wake its screen and this will reconnect on its own.'
+  'Wake its screen and this will reconnect on its own. ' +
+  'If it was restarted, its address may have changed (see the bottom of the page).'
 
 function friendly(message) {
   if (/cannot reach|not responding|timed out|Failed to fetch|NetworkError/i.test(message)) {
@@ -105,8 +106,39 @@ const fmt = (t) => {
   return Number.isInteger(n) ? String(n) : n.toFixed(1)
 }
 
+// The tablet gets a new IP when it restarts, so the address is editable here.
+const hostInput = ref('')
+const hostMsg = ref('')
+const hostErr = ref(false)
+const hostSaving = ref(false)
+
+async function saveHost() {
+  hostSaving.value = true
+  hostMsg.value = ''
+  try {
+    const res = await fetch('/api/tablet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ host: hostInput.value }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(body.detail || `Error ${res.status}`)
+    hostInput.value = body.host
+    version.value = { ...version.value, tablet: `${body.host}:${body.port}` }
+    hostErr.value = false
+    hostMsg.value = `Saved. Now talking to ${body.host}.`
+    await refresh()
+  } catch (e) {
+    hostErr.value = true
+    hostMsg.value = e.message || 'Could not save the address'
+  } finally {
+    hostSaving.value = false
+  }
+}
+
 onMounted(async () => {
   version.value = (await call('/api/version')) || {}
+  hostInput.value = version.value.tablet?.split(':')[0] ?? ''
   await refresh()
   poll = setInterval(refresh, 10000)
 })
@@ -215,6 +247,26 @@ onUnmounted(() => clearInterval(poll))
           {{ z.state === 'open' ? 'On' : 'Off' }}
         </button>
       </div>
+    </div>
+
+    <div class="card">
+      <h2><label for="tablet-host">Tablet address</label></h2>
+      <form class="row host-row" @submit.prevent="saveHost">
+        <input
+          id="tablet-host"
+          v-model="hostInput"
+          type="text"
+          inputmode="decimal"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          placeholder="192.168.1.x"
+        />
+        <button type="submit" :disabled="hostSaving || !hostInput.trim()">
+          {{ hostSaving ? 'Saving…' : 'Save' }}
+        </button>
+      </form>
+      <div class="host-msg" :class="{ err: hostErr }" role="status">{{ hostMsg }}</div>
     </div>
 
     <div class="foot">
