@@ -128,6 +128,10 @@ class TabletBody(BaseModel):
     host: str
 
 
+class MyZoneBody(BaseModel):
+    zone: str = Field(..., description="Zone id, like z01")
+
+
 class ZoneBody(BaseModel):
     state: str | None = None
     setTemp: float | None = None
@@ -287,6 +291,32 @@ async def heat_on(body: TempBody):
             "countDownToOn": "0",
         }
     )
+
+
+@app.post("/api/myzone")
+async def my_zone(body: MyZoneBody):
+    """Choose which room the unit follows (myZone).
+
+    Only a room with a temperature sensor can lead: the unit steers by that
+    room's reading. The room is opened in the same request, because a closed
+    damper would leave the unit chasing a temperature it cannot change.
+    """
+    c = _client()
+    try:
+        status = summarize(await c.get_system_data())
+        z = next((z for z in status["zones"] if z["id"] == body.zone), None)
+        if z is None:
+            raise HTTPException(404, f"no room called {body.zone}")
+        if not z["hasSensor"] or z["number"] is None:
+            raise HTTPException(400, f"{z['name']} has no temperature sensor, so it cannot control the heating")
+        change: dict = {"info": {"myZone": z["number"]}}
+        if z["state"] != "open":
+            change["zones"] = {z["id"]: {"state": "open"}}
+        await c.set_aircon({status["acId"]: change})
+        await asyncio.sleep(SETTLE_SECONDS)
+        return summarize(await c.get_system_data())
+    except AirconError as exc:
+        raise HTTPException(502, str(exc)) from exc
 
 
 @app.post("/api/zone/{zone_id}/temp")

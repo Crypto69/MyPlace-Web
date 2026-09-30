@@ -109,6 +109,10 @@ curl -s -G "http://$TABLET:2025/setAircon" \
 curl -s -G "http://$TABLET:2025/setAircon" \
   --data-urlencode 'json={"ac1":{"info":{"state":"off"}}}'
 
+# Make zone 2 the room the unit follows (myZone), opening it too
+curl -s -G "http://$TABLET:2025/setAircon" \
+  --data-urlencode 'json={"ac1":{"info":{"myZone":2},"zones":{"z02":{"state":"open"}}}}'
+
 # Open zone 1, set it to 22°C
 curl -s -G "http://$TABLET:2025/setAircon" \
   --data-urlencode 'json={"ac1":{"zones":{"z01":{"state":"open","setTemp":22}}}}'

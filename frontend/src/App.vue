@@ -75,6 +75,10 @@ const turnOff = () => post('/api/power/off')
 const setTemp = (temp) => post('/api/temp', { temp })
 const setZone = (id, change) => post(`/api/zone/${id}`, change)
 const setZoneTemp = (id, temp) => post(`/api/zone/${id}/temp`, { temp })
+const setMyZone = (id) => post('/api/myzone', { zone: id })
+
+// Only rooms with a sensor can lead the heating.
+const leaders = computed(() => status.value?.zones?.filter((z) => z.hasSensor) ?? [])
 
 // The unit follows one zone (myZone); its target is what actually drives the
 // heating, so that is the number the UI has to put front and centre.
@@ -221,6 +225,22 @@ onUnmounted(() => clearInterval(poll))
           @click="quickSet(t)"
         >
           {{ t }}&deg;
+        </button>
+      </div>
+    </div>
+
+    <div class="card" v-if="leaders.length > 1">
+      <h2>Which room controls the heating</h2>
+      <div class="row">
+        <button
+          v-for="z in leaders"
+          :key="z.id"
+          :class="{ active: z.isControlling }"
+          :aria-pressed="z.isControlling"
+          :disabled="busy"
+          @click="!z.isControlling && setMyZone(z.id)"
+        >
+          {{ z.name }}
         </button>
       </div>
     </div>
