@@ -279,18 +279,27 @@ async def fan(body: FanBody):
     return await _send({"fan": body.fan})
 
 
-@app.post("/api/heat-on")
-async def heat_on(body: TempBody):
-    """One tap: power on, mode heat, target temperature — a single request."""
+async def _start(mode: str, temp: float) -> dict:
+    """One tap: power on, set the mode and target temperature in one request."""
     return await _send(
         {
             "state": "on",
-            "mode": "heat",
-            "setTemp": _clamp(body.temp),
+            "mode": mode,
+            "setTemp": _clamp(temp),
             "countDownToOff": "0",
             "countDownToOn": "0",
         }
     )
+
+
+@app.post("/api/heat-on")
+async def heat_on(body: TempBody):
+    return await _start("heat", body.temp)
+
+
+@app.post("/api/cool-on")
+async def cool_on(body: TempBody):
+    return await _start("cool", body.temp)
 
 
 @app.post("/api/myzone")

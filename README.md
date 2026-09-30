@@ -100,6 +100,8 @@ To point at the real system instead, set `MYPLACE_HOST` to the tablet's IP.
 | GET | `/api/version` | – | Build SHA, tablet address, temp limits |
 | GET / POST | `/api/tablet` | `{"host": "192.168.1.20"}` | Read / change the tablet's address (saved) |
 | POST | `/api/heat-on` | `{"temp": 21}` | On + heat + temperature, one request |
+| POST | `/api/cool-on` | `{"temp": 21}` | On + cool + temperature, one request |
+| POST | `/api/myzone` | `{"zone": "z02"}` | Choose the room that controls the unit |
 | POST | `/api/power/on\|off` | – | Power |
 | POST | `/api/mode` | `{"mode": "heat"}` | cool/heat/vent/auto/dry/myauto |
 | POST | `/api/temp` | `{"temp": 21}` | Target temperature |

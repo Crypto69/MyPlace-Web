@@ -63,14 +63,15 @@ const post = (path, body) =>
   call(path, { method: 'POST', body: JSON.stringify(body ?? {}) })
     .then((r) => { if (r) status.value = r })
 
-const heatOn = (temp) => post('/api/heat-on', { temp })
-
-// A preset has to do both: make sure the system is on and heating, then set
-// the target on the room that actually governs it.
-async function quickSet(temp) {
-  await heatOn(temp)
+// Heating and cooling are the same one-tap start with a different mode.
+async function start(mode, temp) {
+  await post(`/api/${mode}-on`, { temp })
   if (controlling.value) await setZoneTemp(controlling.value.id, temp)
 }
+
+// A preset keeps whatever the unit is doing: cooling stays cooling. From off,
+// or any other mode, it means heating - the common case in this house.
+const quickSet = (temp) => start(isCooling.value ? 'cool' : 'heat', temp)
 const turnOff = () => post('/api/power/off')
 const setTemp = (temp) => post('/api/temp', { temp })
 const setZone = (id, change) => post(`/api/zone/${id}`, change)
@@ -95,6 +96,8 @@ const roomDown = () =>
 
 const isOn = computed(() => status.value?.state === 'on')
 const isHeating = computed(() => isOn.value && status.value?.mode === 'heat')
+const isCooling = computed(() => isOn.value && status.value?.mode === 'cool')
+const isRunning = computed(() => isHeating.value || isCooling.value)
 const target = computed(() => status.value?.setTemp ?? 20)
 
 // The step comes from the backend: this system only accepts whole degrees,
@@ -151,11 +154,11 @@ onUnmounted(() => clearInterval(poll))
 
 <template>
   <div class="wrap">
-    <div class="card status">
+    <div class="card status" :class="{ heating: isHeating, cooling: isCooling }">
       <h1>{{ status?.name || 'Heating' }}</h1>
       <div class="big">
         <span class="dot" :class="{ on: isOn }"></span>
-        <span v-if="isHeating">{{ fmt(roomTarget) }}&deg;</span>
+        <span v-if="isRunning">{{ fmt(roomTarget) }}&deg;</span>
         <span v-else-if="isOn">On</span>
         <span v-else>Off</span>
       </div>
@@ -165,6 +168,11 @@ onUnmounted(() => clearInterval(poll))
           heating to {{ fmt(roomTarget) }}&deg;
         </span>
         <span v-else-if="isHeating">Heating to {{ fmt(target) }}&deg;</span>
+        <span v-else-if="isCooling && controlling">
+          {{ controlling.name }} &middot; now {{ fmt(controlling.measuredTemp) }}&deg;,
+          cooling to {{ fmt(roomTarget) }}&deg;
+        </span>
+        <span v-else-if="isCooling">Cooling to {{ fmt(target) }}&deg;</span>
         <span v-else-if="isOn">Running in {{ status?.mode }} mode</span>
         <span v-else>The heating is off</span>
       </div>
@@ -179,10 +187,20 @@ onUnmounted(() => clearInterval(poll))
       <button
         class="btn-heat"
         :class="{ active: isHeating }"
+        :aria-pressed="isHeating"
         :disabled="busy"
-        @click="quickSet(roomTarget)"
+        @click="start('heat', roomTarget)"
       >
-        Heat On
+        Heating On
+      </button>
+      <button
+        class="btn-cool"
+        :class="{ active: isCooling }"
+        :aria-pressed="isCooling"
+        :disabled="busy"
+        @click="start('cool', roomTarget)"
+      >
+        Cooling On
       </button>
       <button
         class="btn-off"
@@ -220,7 +238,7 @@ onUnmounted(() => clearInterval(poll))
         <button
           v-for="t in PRESETS"
           :key="t"
-          :class="{ active: isHeating && Number(roomTarget) === t }"
+          :class="{ active: isRunning && Number(roomTarget) === t }"
           :disabled="busy"
           @click="quickSet(t)"
         >

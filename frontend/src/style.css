@@ -14,6 +14,8 @@
   --muted: #9fb0c8;
   --heat: #e8590c;
   --heat-hi: #ff7a2f;
+  --cool: #1c7ed6;
+  --cool-hi: #339af0;
   --on: #2f9e44;
   --off: #495366;
   --danger: #c92a2a;
@@ -116,19 +118,29 @@ h2 { font-size: 1rem; margin: 0 0 12px; color: var(--muted); font-weight: 600; }
   background: var(--off);
 }
 .dot.on { background: var(--on); }
+/* The mode is told by colour as well as words: orange heating, blue cooling.
+   Only colours change, never sizes, so nothing shifts when the mode flips. */
+.status.heating { border-color: var(--heat); }
+.status.heating .big { color: var(--heat-hi); }
+.status.heating .dot.on { background: var(--heat); }
+.status.cooling { border-color: var(--cool); }
+.status.cooling .big { color: var(--cool-hi); }
+.status.cooling .dot.on { background: var(--cool); }
 
 /* ---- main actions ---- */
 .btn-heat { background: var(--heat); min-height: 96px; font-size: 1.5rem; }
 .btn-heat:hover:not(:disabled) { background: var(--heat-hi); }
+.btn-cool { background: var(--cool); min-height: 96px; font-size: 1.5rem; }
+.btn-cool:hover:not(:disabled) { background: var(--cool-hi); }
 .btn-off { background: var(--off); min-height: 96px; font-size: 1.5rem; }
 .btn-off:hover:not(:disabled) { background: #5b6779; }
 
 /* Shows which mode/preset is currently active. The ring marks the active
    control; the button keeps its own colour, so "Heat On" stays orange while
-   it is the live state rather than going grey. */
+   it is the live state rather than going grey (and "Cooling On" stays blue). */
 .active { border-color: var(--focus); }
 /* Only plain buttons (no colour of their own) get the fill. */
-button.active:not(.btn-heat):not(.btn-off) { background: var(--line); }
+button.active:not(.btn-heat):not(.btn-cool):not(.btn-off) { background: var(--line); }
 
 .temp-display {
   font-size: 2.6rem;
