@@ -87,17 +87,25 @@ const controlling = computed(() =>
   status.value?.zones?.find((z) => z.isControlling) ?? null,
 )
 const roomTarget = computed(() => controlling.value?.setTemp ?? target.value)
-const roomUp = () =>
-  controlling.value &&
-  setZoneTemp(controlling.value.id, Math.min(roomTarget.value + step.value, version.value.maxTemp ?? 30))
-const roomDown = () =>
-  controlling.value &&
-  setZoneTemp(controlling.value.id, Math.max(roomTarget.value - step.value, version.value.minTemp ?? 16))
+
+// Every room with a sensor keeps its own target; one step up or down, kept
+// inside the limits the backend enforces anyway.
+function nudge(z, dir) {
+  const next = (z.setTemp ?? target.value) + dir * step.value
+  const lo = version.value.minTemp ?? 16
+  const hi = version.value.maxTemp ?? 30
+  return setZoneTemp(z.id, Math.min(hi, Math.max(lo, next)))
+}
+const roomUp = () => controlling.value && nudge(controlling.value, 1)
+const roomDown = () => controlling.value && nudge(controlling.value, -1)
 
 const isOn = computed(() => status.value?.state === 'on')
 const isHeating = computed(() => isOn.value && status.value?.mode === 'heat')
 const isCooling = computed(() => isOn.value && status.value?.mode === 'cool')
 const isRunning = computed(() => isHeating.value || isCooling.value)
+// Follows the unit's mode even while it is off: that is what the leading
+// room will do the moment it comes back on.
+const modeWord = computed(() => (status.value?.mode === 'cool' ? 'cooling' : 'heating'))
 const target = computed(() => status.value?.setTemp ?? 20)
 
 // The step comes from the backend: this system only accepts whole degrees,
@@ -248,7 +256,7 @@ onUnmounted(() => clearInterval(poll))
     </div>
 
     <div class="card" v-if="leaders.length > 1">
-      <h2>Which room controls the heating</h2>
+      <h2>Which room controls the {{ modeWord }}</h2>
       <div class="row">
         <button
           v-for="z in leaders"
@@ -268,15 +276,34 @@ onUnmounted(() => clearInterval(poll))
       <div class="zone" v-for="z in status.zones" :key="z.id">
         <div class="name">
           {{ z.name }}
-          <span v-if="z.isControlling" class="tag">controls heating</span>
+          <span v-if="z.isControlling" class="tag" :class="modeWord">controls {{ modeWord }}</span>
           <div class="meta">
             <span v-if="z.measuredTemp !== null && z.measuredTemp !== undefined">
               now {{ fmt(z.measuredTemp) }}&deg;
             </span>
-            <span v-if="z.hasSensor && z.setTemp"> &middot; set {{ fmt(z.setTemp) }}&deg;</span>
-            <span v-else-if="!z.hasSensor && z.value !== null"> &middot; {{ z.value }}% open</span>
+            <span v-else-if="!z.hasSensor && z.value !== null">{{ z.value }}% open</span>
           </div>
         </div>
+        <!-- Rooms without a sensor get a same-width spacer, so every On/Off
+             button lines up in one column. -->
+        <div class="zone-temp" v-if="z.hasSensor">
+          <button
+            class="btn-zstep"
+            :disabled="busy"
+            :aria-label="`${z.name} cooler`"
+            @click="nudge(z, -1)"
+          >&minus;</button>
+          <div class="zone-set" :aria-label="`${z.name} set to ${fmt(z.setTemp)} degrees`">
+            {{ fmt(z.setTemp) }}&deg;
+          </div>
+          <button
+            class="btn-zstep"
+            :disabled="busy"
+            :aria-label="`${z.name} warmer`"
+            @click="nudge(z, 1)"
+          >+</button>
+        </div>
+        <div class="zone-temp" v-else aria-hidden="true"></div>
         <button
           :class="z.state === 'open' ? 'btn-open' : 'btn-close'"
           :disabled="busy"
