@@ -8,6 +8,7 @@ must never be exposed to the internet.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import ipaddress
 import json
 import logging
@@ -33,6 +34,8 @@ from .aircon import (
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
+# httpx logs every request at INFO; with a beat every 30s that buries the log.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 TABLET_PORT = int(os.environ.get("MYPLACE_PORT", "2025"))
 BUILD_SHA = os.environ.get("APP_BUILD_SHA", "unknown")
@@ -46,9 +49,57 @@ MAX_TEMP = float(os.environ.get("MYPLACE_MAX_TEMP", "30"))
 # to the user like the app not working.
 TEMP_STEP = float(os.environ.get("MYPLACE_TEMP_STEP", "1"))
 
-app = FastAPI(title="MyPlace Heating")
 # The tablet's wifi is slow to wake, so the default timeout is generous.
 TIMEOUT = float(os.environ.get("MYPLACE_TIMEOUT", "20"))
+
+# Left alone, the tablet's wifi goes to sleep and then ignores the LAN
+# completely: connects fail with "no route to host" and no amount of knocking
+# brings it back (20 minutes of retries did not, in the logs that prompted
+# this). Contact at least once a minute has never been followed by a failure,
+# so say hello this often even when nobody has the page open. 0 turns it off.
+KEEPALIVE = float(os.environ.get("MYPLACE_KEEPALIVE", "30"))
+# While it is not answering, look more often, to catch it the moment it is back.
+KEEPALIVE_DOWN = min(KEEPALIVE, 10.0)
+
+
+async def _keep_awake() -> None:
+    """Contact the tablet on a timer so its wifi never gets the chance to sleep."""
+    answering: bool | None = None  # unknown until the first beat
+    down_since = 0.0
+    loop = asyncio.get_running_loop()
+
+    while True:
+        await asyncio.sleep(KEEPALIVE if answering is not False else KEEPALIVE_DOWN)
+        tablet = client  # re-read: the address can be changed from the page
+        if tablet is None:
+            continue
+
+        # The open page polls on its own; only fill the gaps it leaves.
+        idle = tablet.idle_seconds()
+        ok = True if idle is not None and idle < KEEPALIVE else await tablet.beat()
+
+        if ok and answering is False:
+            log.info("tablet is answering again after %.0f min", (loop.time() - down_since) / 60)
+        elif not ok and answering is not False:
+            down_since = loop.time()
+            log.warning("tablet at %s has stopped answering; will keep trying", tablet.host)
+        answering = ok
+
+
+@contextlib.asynccontextmanager
+async def _lifespan(_: FastAPI):
+    task = None
+    if KEEPALIVE > 0:
+        log.info("keep-awake: contacting the tablet every %.0fs", KEEPALIVE)
+        task = asyncio.create_task(_keep_awake())
+    yield
+    if task:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+
+app = FastAPI(title="MyPlace Heating", lifespan=_lifespan)
 
 ROOT = Path(__file__).resolve().parent.parent
 FRONTEND = ROOT / "frontend" / "dist"
@@ -189,6 +240,9 @@ async def diagnose():
 
     host = _client().host
     result: dict[str, Any] = {"tablet": host, "port": TABLET_PORT}
+    idle = _client().idle_seconds()
+    result["keepAwakeEvery"] = KEEPALIVE
+    result["lastAnswerSecondsAgo"] = None if idle is None else round(idle)
 
     # Can we open a TCP connection at all?
     sock = socket.socket()

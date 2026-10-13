@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from typing import Any
 
 import httpx
@@ -43,23 +44,36 @@ class AirconClient:
         self.host = host
         self.port = port
         self.timeout = timeout
+        # time.monotonic() of the last good answer; None until there is one.
+        # The keep-awake loop reads this to skip beats the page already covered.
+        self.last_ok: float | None = None
 
     @property
     def base(self) -> str:
         return f"http://{self.host}:{self.port}"
 
-    async def _get(self, endpoint: str, params: dict[str, str] | None = None) -> dict:
+    async def _get(
+        self,
+        endpoint: str,
+        params: dict[str, str] | None = None,
+        retries: int = RETRIES,
+        quiet: bool = False,
+    ) -> dict:
         """One request, retried on the tablet's occasional hiccups.
 
         The tablet is a small embedded device and will sometimes drop a
         connection or return a truncated body while it is busy applying a
         change. Those are transient, so retry briefly rather than surfacing
         an error to someone who just wants the heating on.
+
+        `quiet` is for the keep-awake loop, which reports an outage once
+        itself rather than logging every failed beat.
         """
         url = f"{self.base}/{endpoint}"
         last: Exception | None = None
+        warn = log.debug if quiet else log.warning
 
-        for attempt in range(RETRIES):
+        for attempt in range(retries):
             if attempt:
                 await asyncio.sleep(RETRY_DELAY * attempt)
             async with _lock:
@@ -75,7 +89,7 @@ class AirconClient:
                         text = resp.text
                 except httpx.HTTPError as exc:
                     last = exc
-                    log.warning("tablet request failed (%s/%s): %s", attempt + 1, RETRIES, exc)
+                    warn("tablet request failed (%s/%s): %s", attempt + 1, retries, exc)
                     continue
 
             try:
@@ -83,7 +97,7 @@ class AirconClient:
             except json.JSONDecodeError as exc:
                 # A truncated body: the tablet was mid-update. Worth retrying.
                 last = exc
-                log.warning("tablet returned partial JSON (%s/%s)", attempt + 1, RETRIES)
+                warn("tablet returned partial JSON (%s/%s)", attempt + 1, retries)
                 continue
 
             # For a short window after a change, the tablet answers 200 with a
@@ -92,9 +106,10 @@ class AirconClient:
             # decoder, and retried like any other transient failure.
             if endpoint == "getSystemData" and "aircons" not in data:
                 last = AirconError("tablet returned an empty state")
-                log.warning("tablet state not ready (%s/%s)", attempt + 1, RETRIES)
+                warn("tablet state not ready (%s/%s)", attempt + 1, retries)
                 continue
 
+            self.last_ok = time.monotonic()
             return data
 
         raise AirconError(
@@ -105,6 +120,23 @@ class AirconClient:
     async def get_system_data(self) -> dict:
         """Full system state: every aircon unit, every zone."""
         return await self._get("getSystemData")
+
+    def idle_seconds(self) -> float | None:
+        """Seconds since the tablet last answered, or None if it never has."""
+        return None if self.last_ok is None else time.monotonic() - self.last_ok
+
+    async def beat(self) -> bool:
+        """One cheap, unretried contact, to stop the tablet's wifi dozing off.
+
+        A single attempt on purpose: a beat that fails is simply tried again
+        on the next tick, and retrying here would only queue behind (and
+        delay) a real request from the page.
+        """
+        try:
+            await self._get("getSystemData", retries=1, quiet=True)
+            return True
+        except AirconError:
+            return False
 
     async def set_aircon(self, payload: dict[str, Any]) -> dict:
         """Send a setAircon change.

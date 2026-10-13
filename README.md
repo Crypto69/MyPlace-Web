@@ -144,6 +144,14 @@ It is wall-powered, so there is no battery cost. If it does go to sleep, the
 app says so plainly rather than showing a connection error, and reconnects by
 itself once the tablet is awake.
 
+As a stopgap for tablets where that setting is out of reach, the app also
+contacts the tablet every 30 seconds, page open or not, because a tablet that
+is spoken to regularly does not doze off. Once it *is* asleep nothing sent
+over the LAN wakes it, so this prevents the problem rather than curing it: if
+the tablet reboots or drops off anyway, the app keeps trying and holds it
+awake from the moment it is back. Change the interval with
+`MYPLACE_KEEPALIVE` (seconds; `0` turns it off).
+
 ## Zoned systems: which temperature actually matters
 
 A zoned system has a system-level `setTemp` *and* a target per zone. The unit
